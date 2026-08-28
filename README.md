@@ -7,7 +7,7 @@
 ## 识别流程
 
 1. 优先读取页面 DOM 中的题干与选项。
-2. 性格量表题使用原插件的积极、平衡或随机策略，不依赖本地服务。
+2. 性格量表题默认使用 `Blunnny/FUCK_BEISEN` 的分类题库和默认答案，也可切换积极、平衡或随机策略，不依赖本地服务。
 3. 能力题使用 RapidFuzz 对标准化后的题干和选项做模糊检索。
 4. 图表/图形题读取页面原图，用 pHash 粗排图库，再用 ORB + SSIM 复核。
 5. 根据题库答案文本重新匹配页面选项，不依赖页面 A/B/C/D 顺序。
@@ -82,6 +82,7 @@ python -m json.tool manifest.json
 ## 来源与许可
 
 - 扩展形态参考 [`1642778819-pixel/beisen-psychometric-helper`](https://github.com/1642778819-pixel/beisen-psychometric-helper)。该仓库 README 声明 MIT，但仓库未附独立 `LICENSE` 文件。
+- 心理单选分类和形容词排序来自 MIT 许可的 [`Blunnny/FUCK_BEISEN`](https://github.com/Blunnny/FUCK_BEISEN)，版权声明见 `third_party/Blunnny-FUCK_BEISEN-LICENSE.txt`。
 - DOM 截图/OCR 组织方式参考 [`ArtLjn/chaoxing-qa`](https://github.com/ArtLjn/chaoxing-qa)。
 - 题库来自 [`Liqing-Lin/BeiSen_Practice`](https://github.com/Liqing-Lin/BeiSen_Practice)，本仓库不重新发布题库文本和图片。
 

@@ -80,3 +80,15 @@
   outline-offset: 3px !important;
   background-color: rgba(33, 163, 91, .12) !important;
 }
+
+.beisen-helper-most {
+  outline: 3px solid #21a35b !important;
+  outline-offset: 3px !important;
+  background-color: rgba(33, 163, 91, .12) !important;
+}
+
+.beisen-helper-least {
+  outline: 3px solid #d64545 !important;
+  outline-offset: 3px !important;
+  background-color: rgba(214, 69, 69, .10) !important;
+}

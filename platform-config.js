@@ -31,7 +31,8 @@ const PLATFORM_CONFIG = {
       ],
       options: [
         '.single-choice__item', '.multiple-choice__item',
-        '[class*="choice__item"]'
+        '[class*="choice__item"]',
+        'div[data-cls="tuozhuai-content"] span[class*="I6Yvw"]'
       ]
     }
   }

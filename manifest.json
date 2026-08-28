@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "北森题库识别助手",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "从本地题库识别北森测评题目、图形并高亮匹配选项",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
@@ -32,7 +32,7 @@
         "*://*.beisenc.com/*",
         "https://iflytek.ceping.com/*"
       ],
-      "js": ["platform-config.js", "content.js"],
+      "js": ["platform-config.js", "psychometric-profile.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": true,

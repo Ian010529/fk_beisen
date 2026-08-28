@@ -5,7 +5,7 @@
   const config = window.PLATFORM_CONFIG[platformKey];
   let currentOptionElements = [];
   let autoRecognize = true;
-  let personalityStrategy = 'balanced';
+  let personalityStrategy = 'profile';
   let identifyInFlight = false;
   let lastFingerprint = '';
   let recognizeTimer = null;
@@ -76,7 +76,27 @@
     return options.filter(option => scaleWords.some(word => option.includes(word))).length >= 2;
   }
 
+  function normalizeProfileText(value) {
+    return value.replace(/[\s，。！？、；：,.!?;:()（）]/g, '');
+  }
+
+  function findProfileAnswer(stem) {
+    const needle = normalizeProfileText(stem);
+    for (const [answer, questions] of Object.entries(window.PSYCHOMETRIC_PROFILE.answerCategories)) {
+      for (const question of questions) {
+        const candidate = normalizeProfileText(question);
+        if (needle.includes(candidate) || candidate.includes(needle)) return answer;
+      }
+    }
+    return window.PSYCHOMETRIC_PROFILE.defaultAnswer;
+  }
+
   function selectPersonalityOption(stem, options) {
+    if (personalityStrategy === 'profile') {
+      const answer = findProfileAnswer(stem);
+      const index = options.findIndex(option => normalizeProfileText(option).includes(answer));
+      return index >= 0 ? index : 0;
+    }
     if (personalityStrategy === 'random') {
       return Math.floor(Math.random() * options.length);
     }
@@ -97,9 +117,31 @@
     if (currentOptionElements[index]) {
       currentOptionElements[index].classList.add('beisen-helper-answer');
     }
-    const strategyNames = { positive: '积极', balanced: '平衡', random: '随机' };
+    const strategyNames = { profile: '题库', positive: '积极', balanced: '平衡', random: '随机' };
     setStatus(
       `心理测评 · ${strategyNames[personalityStrategy]}策略<br><strong>${escapeHtml(payload.options[index])}</strong>`,
+      'success',
+      true
+    );
+  }
+
+  function isAdjectiveChoice(options) {
+    return options.length === 3 && Boolean(document.querySelector('[data-cls="tuozhuai-content"]'));
+  }
+
+  function showAdjectiveSuggestion(payload) {
+    const ranking = window.PSYCHOMETRIC_PROFILE.adjectiveRanking;
+    const ranked = payload.options.map((option, index) => {
+      const priority = ranking.findIndex(adjective => option.includes(adjective));
+      return { index, priority: priority >= 0 ? priority : ranking.length };
+    }).sort((a, b) => a.priority - b.priority);
+    const most = ranked[0].index;
+    const least = ranked[ranked.length - 1].index;
+    currentOptionElements[most]?.classList.add('beisen-helper-most');
+    currentOptionElements[least]?.classList.add('beisen-helper-least');
+    setStatus(
+      `形容词三选二<br><strong>最符合：${escapeHtml(payload.options[most])}</strong><br>` +
+      `最不符合：${escapeHtml(payload.options[least])}`,
       'success',
       true
     );
@@ -121,6 +163,11 @@
     setStatus('正在识别…', 'working');
     clearHighlights();
     try {
+      if (isAdjectiveChoice(payload.options)) {
+        lastFingerprint = currentFingerprint;
+        showAdjectiveSuggestion(payload);
+        return;
+      }
       if (isPersonalityScale(payload.options)) {
         lastFingerprint = currentFingerprint;
         showPersonalitySuggestion(payload);
@@ -173,8 +220,8 @@
   }
 
   function clearHighlights() {
-    document.querySelectorAll('.beisen-helper-answer').forEach(element => {
-      element.classList.remove('beisen-helper-answer');
+    document.querySelectorAll('.beisen-helper-answer, .beisen-helper-most, .beisen-helper-least').forEach(element => {
+      element.classList.remove('beisen-helper-answer', 'beisen-helper-most', 'beisen-helper-least');
     });
   }
 
@@ -210,6 +257,7 @@
         <label class="beisen-helper-strategy">
           心理策略
           <select id="beisen-helper-strategy">
+            <option value="profile" ${personalityStrategy === 'profile' ? 'selected' : ''}>题库</option>
             <option value="positive" ${personalityStrategy === 'positive' ? 'selected' : ''}>积极</option>
             <option value="balanced" ${personalityStrategy === 'balanced' ? 'selected' : ''}>平衡</option>
             <option value="random" ${personalityStrategy === 'random' ? 'selected' : ''}>随机</option>
@@ -250,9 +298,9 @@
   });
 
   function init() {
-    chrome.storage.local.get({ autoRecognize: true, personalityStrategy: 'balanced' }, result => {
+    chrome.storage.local.get({ autoRecognize: true, personalityStrategy: 'profile' }, result => {
       autoRecognize = result.autoRecognize !== false;
-      personalityStrategy = result.personalityStrategy || 'balanced';
+      personalityStrategy = result.personalityStrategy || 'profile';
       if (findQuestion()) createPanel();
 
       const observer = new MutationObserver(mutations => {
