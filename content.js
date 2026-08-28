@@ -3,6 +3,10 @@
 
   const config = window.PLATFORM_CONFIG.beisen;
   let currentOptionElements = [];
+  let autoRecognize = true;
+  let identifyInFlight = false;
+  let lastFingerprint = '';
+  let recognizeTimer = null;
 
   function isVisible(element) {
     const rect = element.getBoundingClientRect();
@@ -58,19 +62,55 @@
     };
   }
 
-  async function identify() {
+  function fingerprint(payload) {
+    return JSON.stringify([payload.stem, payload.options, payload.imageUrls]);
+  }
+
+  async function identify({ automatic = false } = {}) {
+    if (identifyInFlight) return;
+    let payload;
+    try {
+      payload = extractCurrentQuestion();
+    } catch (error) {
+      if (!automatic) setStatus(error.message, 'error');
+      return;
+    }
+    const currentFingerprint = fingerprint(payload);
+    if (automatic && (!autoRecognize || currentFingerprint === lastFingerprint)) return;
+
+    identifyInFlight = true;
     setStatus('正在识别…', 'working');
     clearHighlights();
     try {
-      const payload = extractCurrentQuestion();
       const response = await chrome.runtime.sendMessage({ action: 'matchQuestion', payload });
       if (!response?.ok) throw new Error(response?.error || '识别请求失败');
       const match = response.data?.match;
       if (!match) throw new Error('题库中没有达到阈值的候选题');
+      lastFingerprint = currentFingerprint;
       showMatch(match);
     } catch (error) {
       setStatus(error.message, 'error');
+    } finally {
+      identifyInFlight = false;
     }
+  }
+
+  function scheduleAutoRecognize() {
+    clearTimeout(recognizeTimer);
+    recognizeTimer = setTimeout(() => {
+      if (!findQuestion()) return;
+      createPanel();
+      identify({ automatic: true });
+    }, 500);
+  }
+
+  function placePanelForFullscreen() {
+    const panel = document.getElementById('beisen-helper-panel');
+    if (!panel) return;
+    const fullscreen = document.fullscreenElement;
+    const replacedElement = fullscreen?.matches('iframe, object, embed');
+    const host = fullscreen && !replacedElement ? fullscreen : document.body;
+    if (host && panel.parentElement !== host) host.appendChild(panel);
   }
 
   function showMatch(match) {
@@ -119,10 +159,23 @@
       </div>
       <div id="beisen-helper-body">
         <button id="beisen-helper-identify">识别当前题</button>
+        <label class="beisen-helper-auto">
+          <input id="beisen-helper-auto" type="checkbox" ${autoRecognize ? 'checked' : ''}>
+          自动识别新题
+        </label>
         <div id="beisen-helper-status">等待识别</div>
       </div>`;
     document.body.appendChild(panel);
+    placePanelForFullscreen();
     document.getElementById('beisen-helper-identify').addEventListener('click', identify);
+    document.getElementById('beisen-helper-auto').addEventListener('change', event => {
+      autoRecognize = event.currentTarget.checked;
+      chrome.storage.local.set({ autoRecognize });
+      if (autoRecognize) {
+        lastFingerprint = '';
+        scheduleAutoRecognize();
+      }
+    });
     document.getElementById('beisen-helper-toggle').addEventListener('click', event => {
       const body = document.getElementById('beisen-helper-body');
       const hidden = body.hidden;
@@ -138,6 +191,29 @@
     }
   });
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', createPanel);
-  else createPanel();
+  function init() {
+    chrome.storage.local.get({ autoRecognize: true }, result => {
+      autoRecognize = result.autoRecognize !== false;
+      if (findQuestion()) createPanel();
+
+      const observer = new MutationObserver(mutations => {
+        const onlyPanelChanges = mutations.every(mutation => {
+          const target = mutation.target.nodeType === Node.ELEMENT_NODE
+            ? mutation.target
+            : mutation.target.parentElement;
+          return target?.closest?.('#beisen-helper-panel');
+        });
+        if (!onlyPanelChanges) scheduleAutoRecognize();
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      document.addEventListener('fullscreenchange', () => {
+        placePanelForFullscreen();
+        scheduleAutoRecognize();
+      });
+      scheduleAutoRecognize();
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
