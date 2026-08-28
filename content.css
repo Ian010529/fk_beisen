@@ -43,6 +43,13 @@
   font-weight: 600;
 }
 
+.beisen-helper-shortcut {
+  margin-top: 6px;
+  color: #647481;
+  font-size: 12px;
+  text-align: center;
+}
+
 .beisen-helper-auto {
   display: flex;
   align-items: center;

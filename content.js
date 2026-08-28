@@ -250,6 +250,7 @@
       </div>
       <div id="beisen-helper-body">
         <button id="beisen-helper-identify">识别当前题</button>
+        <div class="beisen-helper-shortcut">全屏快捷键：Alt/⌥ + Shift + B</div>
         <label class="beisen-helper-auto">
           <input id="beisen-helper-auto" type="checkbox" ${autoRecognize ? 'checked' : ''}>
           自动识别新题
@@ -301,7 +302,7 @@
     chrome.storage.local.get({ autoRecognize: true, personalityStrategy: 'profile' }, result => {
       autoRecognize = result.autoRecognize !== false;
       personalityStrategy = result.personalityStrategy || 'profile';
-      if (findQuestion()) createPanel();
+      if (window === window.top || findQuestion()) createPanel();
 
       const observer = new MutationObserver(mutations => {
         const onlyPanelChanges = mutations.every(mutation => {
@@ -316,6 +317,12 @@
       document.addEventListener('fullscreenchange', () => {
         placePanelForFullscreen();
         scheduleAutoRecognize();
+      });
+      document.addEventListener('keydown', event => {
+        if (event.altKey && event.shiftKey && event.code === 'KeyB') {
+          event.preventDefault();
+          identify();
+        }
       });
       scheduleAutoRecognize();
     });
