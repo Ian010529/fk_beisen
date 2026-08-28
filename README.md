@@ -11,9 +11,11 @@
 3. 能力题使用 RapidFuzz 对标准化后的题干和选项做模糊检索。
 4. 图表/图形题读取页面原图，用 pHash 粗排图库，再用 ORB + SSIM 复核。
 5. 根据题库答案文本重新匹配页面选项，不依赖页面 A/B/C/D 顺序。
+6. 只有达到置信度阈值时才高亮建议选项。
 
 进入全屏后无需点击浏览器工具栏，可使用页面悬浮面板或按 `Alt/⌥ + Shift + B` 识别当前题。开启“自动识别新题”后，切换题目约 0.5 秒会自动识别。
-6. 只有达到置信度阈值时才高亮建议选项。
+
+悬浮面板提供三个默认关闭的自动化开关：自动选择答案、自动下一题、自动提交测评。自动提交只匹配明确的“提交测评/提交答卷/完成测评/结束测评”按钮，并在页面确认框中确认提交。
 
 ## 本地资源
 
@@ -47,7 +49,7 @@ beisen-practice serve \
 curl http://127.0.0.1:8765/health
 ```
 
-macOS 也可以双击 `scripts/start_matcher.command` 后台启动，双击 `scripts/stop_matcher.command` 停止。服务不会由 Chrome 扩展自动启动。
+macOS 也可以双击 `scripts/start_matcher.command`，由系统后台服务启动并持续监听；双击 `scripts/stop_matcher.command` 停止。服务不会由 Chrome 扩展自动启动。
 
 ## 加载 Chrome 扩展
 

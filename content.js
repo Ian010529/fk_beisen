@@ -5,8 +5,12 @@
   const config = window.PLATFORM_CONFIG[platformKey];
   let currentOptionElements = [];
   let autoRecognize = true;
+  let autoSelect = false;
+  let autoAdvance = false;
+  let autoSubmit = false;
   let personalityStrategy = 'profile';
   let identifyInFlight = false;
+  let submitInFlight = false;
   let lastFingerprint = '';
   let recognizeTimer = null;
 
@@ -112,6 +116,64 @@
     return Math.floor(options.length / 2);
   }
 
+  function clickElement(element) {
+    if (!element || element.matches(':disabled, [aria-disabled="true"]')) return false;
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+    return true;
+  }
+
+  function findActionElement(labels, root = document) {
+    const normalizedLabels = labels.map(normalizeProfileText);
+    return [...root.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"], div')]
+      .filter(element => !element.closest('#beisen-helper-panel') && isVisible(element))
+      .filter(element => {
+        const value = normalizeProfileText(element.value || textOf(element));
+        return normalizedLabels.includes(value);
+      })
+      .sort((a, b) => a.childElementCount - b.childElementCount)[0] || null;
+  }
+
+  function clickSubmitIfAvailable() {
+    if (!autoSubmit || submitInFlight || !lastFingerprint) return false;
+    const submit = findActionElement(['提交测评', '提交答卷', '完成测评', '结束测评']);
+    if (!submit) return false;
+    submitInFlight = true;
+    clickElement(submit);
+    setTimeout(() => {
+      const dialog = document.querySelector('[role="dialog"], .ant-modal, .el-dialog');
+      const confirm = dialog && findActionElement(['确认提交', '确定', '确认'], dialog);
+      if (confirm) clickElement(confirm);
+    }, 400);
+    return true;
+  }
+
+  function scheduleAdvance(originalFingerprint) {
+    if (!autoAdvance && !autoSubmit) return;
+    setTimeout(() => {
+      try {
+        if (fingerprint(extractCurrentQuestion()) !== originalFingerprint) return;
+      } catch (_) {
+        clickSubmitIfAvailable();
+        return;
+      }
+      if (autoAdvance) {
+        const next = findActionElement(['下一题', '下一步', '继续', 'Next', 'Continue']);
+        if (next) {
+          clickElement(next);
+          return;
+        }
+      }
+      clickSubmitIfAvailable();
+    }, 800);
+  }
+
+  function automateOption(index, payload) {
+    if (!autoSelect || !clickElement(currentOptionElements[index])) return false;
+    scheduleAdvance(fingerprint(payload));
+    return true;
+  }
+
   function showPersonalitySuggestion(payload) {
     const index = selectPersonalityOption(payload.stem, payload.options);
     if (currentOptionElements[index]) {
@@ -119,17 +181,19 @@
     }
     const strategyNames = { profile: '题库', positive: '积极', balanced: '平衡', random: '随机' };
     setStatus(
-      `心理测评 · ${strategyNames[personalityStrategy]}策略<br><strong>${escapeHtml(payload.options[index])}</strong>`,
+      `心理测评 · ${strategyNames[personalityStrategy]}策略<br><strong>${escapeHtml(payload.options[index])}</strong>` +
+      (autoSelect ? '<br>已自动选择' : ''),
       'success',
       true
     );
+    automateOption(index, payload);
   }
 
   function isAdjectiveChoice(options) {
     return options.length === 3 && Boolean(document.querySelector('[data-cls="tuozhuai-content"]'));
   }
 
-  function showAdjectiveSuggestion(payload) {
+  async function showAdjectiveSuggestion(payload) {
     const ranking = window.PSYCHOMETRIC_PROFILE.adjectiveRanking;
     const ranked = payload.options.map((option, index) => {
       const priority = ranking.findIndex(adjective => option.includes(adjective));
@@ -141,10 +205,23 @@
     currentOptionElements[least]?.classList.add('beisen-helper-least');
     setStatus(
       `形容词三选二<br><strong>最符合：${escapeHtml(payload.options[most])}</strong><br>` +
-      `最不符合：${escapeHtml(payload.options[least])}`,
+      `最不符合：${escapeHtml(payload.options[least])}` +
+      (autoSelect ? '<br>正在自动选择' : ''),
       'success',
       true
     );
+    if (!autoSelect) return;
+    if (!clickElement(currentOptionElements[most])) return;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    if (!clickElement(findActionElement(['最符合']))) return;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    if (!clickElement(currentOptionElements[least])) return;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    if (!clickElement(findActionElement(['最不符合']))) return;
+    if (autoAdvance) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      clickElement(findActionElement(['确定', '确认', '下一题', '下一步']));
+    }
   }
 
   async function identify({ automatic = false } = {}) {
@@ -165,7 +242,7 @@
     try {
       if (isAdjectiveChoice(payload.options)) {
         lastFingerprint = currentFingerprint;
-        showAdjectiveSuggestion(payload);
+        await showAdjectiveSuggestion(payload);
         return;
       }
       if (isPersonalityScale(payload.options)) {
@@ -178,7 +255,7 @@
       const match = response.data?.match;
       if (!match) throw new Error('题库中没有达到阈值的候选题');
       lastFingerprint = currentFingerprint;
-      showMatch(match);
+      showMatch(match, payload);
     } catch (error) {
       setStatus(error.message, 'error');
     } finally {
@@ -189,7 +266,10 @@
   function scheduleAutoRecognize() {
     clearTimeout(recognizeTimer);
     recognizeTimer = setTimeout(() => {
-      if (!findQuestion()) return;
+      if (!findQuestion()) {
+        clickSubmitIfAvailable();
+        return;
+      }
       createPanel();
       identify({ automatic: true });
     }, 500);
@@ -204,7 +284,7 @@
     if (host && panel.parentElement !== host) host.appendChild(panel);
   }
 
-  function showMatch(match) {
+  function showMatch(match, payload) {
     const index = match.page_option_index;
     if (Number.isInteger(index) && currentOptionElements[index]) {
       currentOptionElements[index].classList.add('beisen-helper-answer');
@@ -217,6 +297,7 @@
       'success',
       true
     );
+    automateOption(index, payload);
   }
 
   function clearHighlights() {
@@ -255,6 +336,18 @@
           <input id="beisen-helper-auto" type="checkbox" ${autoRecognize ? 'checked' : ''}>
           自动识别新题
         </label>
+        <label class="beisen-helper-auto">
+          <input id="beisen-helper-auto-select" type="checkbox" ${autoSelect ? 'checked' : ''}>
+          自动选择答案
+        </label>
+        <label class="beisen-helper-auto">
+          <input id="beisen-helper-auto-advance" type="checkbox" ${autoAdvance ? 'checked' : ''}>
+          自动下一题
+        </label>
+        <label class="beisen-helper-auto beisen-helper-danger">
+          <input id="beisen-helper-auto-submit" type="checkbox" ${autoSubmit ? 'checked' : ''}>
+          自动提交测评
+        </label>
         <label class="beisen-helper-strategy">
           心理策略
           <select id="beisen-helper-strategy">
@@ -276,6 +369,20 @@
         lastFingerprint = '';
         scheduleAutoRecognize();
       }
+    });
+    document.getElementById('beisen-helper-auto-select').addEventListener('change', event => {
+      autoSelect = event.currentTarget.checked;
+      chrome.storage.local.set({ autoSelect });
+      lastFingerprint = '';
+      if (autoSelect) scheduleAutoRecognize();
+    });
+    document.getElementById('beisen-helper-auto-advance').addEventListener('change', event => {
+      autoAdvance = event.currentTarget.checked;
+      chrome.storage.local.set({ autoAdvance });
+    });
+    document.getElementById('beisen-helper-auto-submit').addEventListener('change', event => {
+      autoSubmit = event.currentTarget.checked;
+      chrome.storage.local.set({ autoSubmit });
     });
     document.getElementById('beisen-helper-strategy').addEventListener('change', event => {
       personalityStrategy = event.currentTarget.value;
@@ -299,8 +406,17 @@
   });
 
   function init() {
-    chrome.storage.local.get({ autoRecognize: true, personalityStrategy: 'profile' }, result => {
+    chrome.storage.local.get({
+      autoRecognize: true,
+      autoSelect: false,
+      autoAdvance: false,
+      autoSubmit: false,
+      personalityStrategy: 'profile'
+    }, result => {
       autoRecognize = result.autoRecognize !== false;
+      autoSelect = result.autoSelect === true;
+      autoAdvance = result.autoAdvance === true;
+      autoSubmit = result.autoSubmit === true;
       personalityStrategy = result.personalityStrategy || 'profile';
       if (window === window.top || findQuestion()) createPanel();
 

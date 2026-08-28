@@ -59,6 +59,8 @@
   user-select: none;
 }
 
+.beisen-helper-danger { color: #b42318; }
+
 .beisen-helper-strategy {
   display: flex;
   align-items: center;
