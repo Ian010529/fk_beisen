@@ -11,13 +11,18 @@ def test_codex_answerer_maps_structured_result(tmp_path):
 
     def fake_runner(args, **kwargs):
         output_path = args[args.index("--output-last-message") + 1]
+        image_path = args[args.index("--image") + 1]
+        assert image_path.endswith("question-0.png")
         with open(output_path, "w", encoding="utf-8") as output:
             json.dump({"option_index": 1, "confidence": 0.9, "reason": "四加四等于八"}, output)
         assert kwargs["input"].endswith('["6", "8", "10"]')
         return subprocess.CompletedProcess(args, 0, "", "")
 
-    result = CodexAnswerer(command, runner=fake_runner).answer("4 + 4 = ?", ["6", "8", "10"])
+    result = CodexAnswerer(command, runner=fake_runner).answer(
+        "4 + 4 = ?", ["6", "8", "10"], [b"\x89PNG\r\n\x1a\nimage"]
+    )
 
     assert result["method"] == "codex"
     assert result["page_option_index"] == 1
     assert result["page_option_text"] == "8"
+    assert result["input_images"] == 1

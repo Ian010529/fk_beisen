@@ -107,6 +107,7 @@ class CodexAnswerer:
                 "option_confidence": 1.0,
                 "image": "",
                 "reason": reason,
+                "input_images": len(image_paths),
             }
 
     @staticmethod

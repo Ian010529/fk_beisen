@@ -64,10 +64,24 @@
       .filter(image => isVisible(image) && image.naturalWidth >= 40 && image.naturalHeight >= 40)
       .map(image => image.currentSrc || image.src)
       .filter(Boolean);
+    for (const element of question.querySelectorAll('*')) {
+      if (!isVisible(element)) continue;
+      const match = getComputedStyle(element).backgroundImage.match(/url\(["']?(.+?)["']?\)/);
+      if (match) imageUrls.push(new URL(match[1], location.href).href);
+    }
+    for (const canvas of question.querySelectorAll('canvas')) {
+      try {
+        if (isVisible(canvas) && canvas.width >= 40 && canvas.height >= 40) {
+          imageUrls.push(canvas.toDataURL('image/png'));
+        }
+      } catch (_) {
+        // A cross-origin canvas cannot be serialized; the viewport screenshot remains available.
+      }
+    }
     return {
       stem: findStem(question),
       options: currentOptionElements.map(textOf),
-      imageUrls
+      imageUrls: [...new Set(imageUrls)]
     };
   }
 
@@ -120,10 +134,43 @@
   }
 
   function clickElement(element) {
-    if (!element || element.matches(':disabled, [aria-disabled="true"]')) return false;
-    element.scrollIntoView({ block: 'center', inline: 'nearest' });
-    element.click();
+    if (!element) return false;
+    const target = element.matches('input, button, label[for], [role="radio"], [role="checkbox"]')
+      ? element
+      : element.querySelector(
+        'input[type="radio"]:not(:disabled), input[type="checkbox"]:not(:disabled), ' +
+        'label[for], [role="radio"], [role="checkbox"], button:not(:disabled)'
+      ) || element;
+    if (target.matches(':disabled, [aria-disabled="true"]')) return false;
+    target.scrollIntoView({ block: 'center', inline: 'nearest' });
+    if (target.matches('input[type="radio"], input[type="checkbox"]')) {
+      if (!target.checked) target.click();
+      if (!target.checked) {
+        target.checked = true;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      return target.checked;
+    }
+    target.click();
     return true;
+  }
+
+  async function requestMatch(payload) {
+    const panel = document.getElementById('beisen-helper-panel');
+    const previousVisibility = panel?.style.visibility || '';
+    if (useCodex && panel) {
+      panel.style.visibility = 'hidden';
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+    try {
+      return await chrome.runtime.sendMessage({
+        action: 'matchQuestion',
+        payload: { ...payload, useCodex }
+      });
+    } finally {
+      if (panel) panel.style.visibility = previousVisibility;
+    }
   }
 
   function findActionElement(labels, root = document) {
@@ -253,10 +300,7 @@
         showPersonalitySuggestion(payload);
         return;
       }
-      const response = await chrome.runtime.sendMessage({
-        action: 'matchQuestion',
-        payload: { ...payload, useCodex }
-      });
+      const response = await requestMatch(payload);
       if (!response?.ok) throw new Error(response?.error || '识别请求失败');
       const match = response.data?.match;
       if (!match) throw new Error('题库中没有达到阈值的候选题');
@@ -299,9 +343,12 @@
     const optionConfidence = Math.round((match.option_confidence || 0) * 100);
     const answer = match.page_option_text || `${match.answer_key}. ${match.answer_text}`;
     const reason = match.reason ? `<br>${escapeHtml(match.reason)}` : '';
+    const imageInfo = Number.isInteger(match.input_images)
+      ? `<br>已发送图片 ${match.input_images} 张`
+      : '';
     setStatus(
       `${match.question_id} · ${match.method} ${confidence}%<br><strong>${escapeHtml(answer)}</strong>` +
-      `${reason}<br>选项匹配 ${optionConfidence}%`,
+      `${reason}${imageInfo}<br>选项匹配 ${optionConfidence}%`,
       'success',
       true
     );

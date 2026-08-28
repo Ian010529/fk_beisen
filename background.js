@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === 'matchQuestion') {
-    matchQuestion(request.payload || {}).then(sendResponse);
+    matchQuestion(request.payload || {}, sender.tab?.windowId).then(sendResponse);
     return true;
   }
 });
@@ -21,9 +21,13 @@ async function checkService() {
   }
 }
 
-async function matchQuestion(payload) {
+async function matchQuestion(payload, windowId) {
   try {
     const images = await Promise.all((payload.imageUrls || []).slice(0, 6).map(fetchImage));
+    if (payload.useCodex === true && Number.isInteger(windowId)) {
+      const screenshot = await captureVisiblePage(windowId);
+      if (screenshot) images.unshift(screenshot);
+    }
     const response = await fetch(`${MATCHER_URL}/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -38,6 +42,15 @@ async function matchQuestion(payload) {
     return { ok: true, data: await response.json() };
   } catch (error) {
     return { ok: false, error: error.message };
+  }
+}
+
+async function captureVisiblePage(windowId) {
+  try {
+    const data = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 90 });
+    return data ? { data } : null;
+  } catch (_) {
+    return null;
   }
 }
 
