@@ -1,30 +1,22 @@
 # Architecture
 
-## Data flow
+```text
+BeiSen page
+  └─ content.js: extract visible stem, options and image URLs
+       └─ background.js: fetch protected images and call localhost
+            └─ Python service
+                 ├─ TextMatcher: normalized stem + option fuzzy search
+                 ├─ ImageMatcher: pHash shortlist → ORB/SSIM rerank
+                 └─ QuestionMatcher: answer text → visible option index
+                      └─ content.js: highlight suggestion
+```
 
-1. `sync` downloads the upstream `questions.js`.
-2. `importer.py` extracts one-line JSON question objects and normalizes them into `Question` dataclasses.
-3. `validator.py` catches missing/invalid answers, A-D shape errors, duplicate IDs, and explicit analysis/answer conflicts.
-4. `question_bank.json` is used by the local practice CLI.
-5. `vision.py` compares local images using perceptual similarity rather than byte/file hashes.
+## Why a local service
 
-## Image similarity
+The question bank and 655 source images already live in the sibling `beisen` directory. Keeping computer-vision code in Python avoids bundling those assets and OpenCV into a browser extension. The service binds to `127.0.0.1` only and does not upload page content.
 
-The image pipeline is designed for resize/re-encode differences:
+## Matching policy
 
-- near-white border crop
-- aspect-ratio-preserving letterbox
-- DCT pHash for broad perceptual similarity
-- ORB local feature matching for structural confirmation
-- SSIM for normalized structural similarity
+Text is preferred when the best candidate is strong and separated from the runner-up. Images are used to confirm text or identify image-heavy questions. A reused chart image is never treated as a unique question by itself; accompanying stem/options disambiguate it.
 
-Combined score = `0.30*pHash + 0.40*ORB + 0.30*SSIM`.
-
-This is intentionally a local image-comparison primitive. It is not wired to Selenium, browser scraping, or assessment submission.
-
-## Future extension points
-
-- Image index cache: precompute pHash + ORB descriptors for all bank images.
-- Grouped data-analysis questions: cluster questions that share the same source chart.
-- UI: reuse the upstream React practice app or expose the normalized JSON to a new frontend.
-- Upstream pinning: change `sync.py` URLs from `main` to a commit SHA for reproducible builds.
+The bank's answer letter is converted to canonical answer text, then fuzzily matched against the visible page options. This handles reordered options.

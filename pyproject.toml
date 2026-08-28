@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "beisen-practice-plus"
-version = "0.1.0"
-description = "Local practice toolkit for importing and validating the BeiSen_Practice question bank."
+version = "0.2.0"
+description = "Local text and image matcher for the BeiSen question bank and Chrome extension."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

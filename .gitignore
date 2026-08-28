@@ -12,3 +12,7 @@ dist/
 # Synced upstream question bank and generated validation output.
 data/*
 !data/.gitkeep
+
+# Local matcher cache and unpacked extension packages.
+*.crx
+extension-build/

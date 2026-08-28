@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rapidfuzz.fuzz import ratio
+from rapidfuzz.fuzz import WRatio
 
 from .models import Question
 from .normalize import normalize_options, normalize_text
@@ -44,9 +44,9 @@ class TextMatcher:
         for q in self.questions:
             if category and q.category != category:
                 continue
-            stem_score = ratio(needle_stem, self._stem[q.id]) / 100.0 if needle_stem else 0.0
+            stem_score = WRatio(needle_stem, self._stem[q.id]) / 100.0 if needle_stem else 0.0
             options_score = (
-                ratio(needle_options, self._options[q.id]) / 100.0
+                WRatio(needle_options, self._options[q.id]) / 100.0
                 if needle_options and self._options[q.id]
                 else 0.0
             )

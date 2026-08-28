@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>北森题库识别</title>
+  <style>
+    body { width: 300px; margin: 0; padding: 16px; color: #1d2a36; font: 14px/1.5 -apple-system, sans-serif; }
+    h1 { margin: 0 0 12px; font-size: 18px; }
+    #status { margin-bottom: 12px; padding: 9px; border-radius: 6px; background: #f2f5f8; }
+    button { width: 100%; padding: 9px; border: 0; border-radius: 6px; background: #1769aa; color: #fff; cursor: pointer; }
+    button:disabled { background: #9aa8b5; cursor: default; }
+    small { display: block; margin-top: 10px; color: #647481; }
+  </style>
+</head>
+<body>
+  <h1>北森题库识别</h1>
+  <div id="status">正在检查本地服务…</div>
+  <button id="identify" disabled>识别当前题</button>
+  <small>仅高亮匹配选项，不会自动提交。</small>
+  <script src="popup.js"></script>
+</body>
+</html>

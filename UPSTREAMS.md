@@ -1,13 +1,9 @@
-# Upstreams
+# Upstream references
 
-## Blunnny/FUCK_BEISEN
+- `1642778819-pixel/beisen-psychometric-helper` — Chrome extension structure and Beisen platform selectors. Its README states MIT; no standalone license file was present when inspected.
+- `ArtLjn/chaoxing-qa` — Manifest V3 DOM/OCR workflow reference.
+- `Liqing-Lin/BeiSen_Practice` — local question-bank and image source.
+- `rapidfuzz/RapidFuzz` — MIT-licensed fuzzy text matching.
+- OpenCV and scikit-image — perceptual image comparison primitives.
 
-- URL: https://github.com/Blunnny/FUCK_BEISEN
-- License shown by upstream: MIT
-- Used as an architecture reference only; this repository does not vendor its Selenium automation code.
-
-## Liqing-Lin/BeiSen_Practice
-
-- URL: https://github.com/Liqing-Lin/BeiSen_Practice
-- Provides the 445-question local-practice bank and image references.
-- The question text/images are not vendored here. `beisen-practice sync` fetches them into ignored local files.
+No upstream question text or bank images are committed here. The local service reads them from a user-supplied directory.

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .importer import parse_questions_js, read_bank, write_bank
 from .practice import run_practice
+from .server import run_server
 from .sync import sync_bank
 from .text_matcher import TextMatcher
 from .validator import validate_questions
@@ -73,6 +74,11 @@ def cmd_practice(args: argparse.Namespace) -> int:
     return run_practice(_load(args.bank), category=args.category, count=args.count)
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    run_server(args.bank, args.image_dir, host=args.host, port=args.port)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="beisen-practice")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -109,6 +115,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--category", choices=["verbal", "data", "graphic"])
     p.add_argument("--count", type=int, default=10)
     p.set_defaults(func=cmd_practice)
+
+    p = sub.add_parser("serve", help="Run the local browser-extension matching service")
+    p.add_argument("--bank", default="../beisen/src/data/questions.js")
+    p.add_argument("--image-dir", default="../beisen/public/question-bank")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.set_defaults(func=cmd_serve)
 
     return parser
 
