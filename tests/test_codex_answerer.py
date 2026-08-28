@@ -29,8 +29,8 @@ def test_codex_answerer_maps_structured_result(tmp_path):
     assert result["page_option_index"] == 1
     assert result["page_option_text"] == "8"
     assert result["input_images"] == 1
-    assert calls[0][calls[0].index("--model") + 1] == "gpt-5.6-luna"
-    assert 'model_reasoning_effort="none"' in calls[0]
+    assert calls[0][calls[0].index("--model") + 1] == "gpt-5.6-sol"
+    assert 'model_reasoning_effort="high"' in calls[0]
     assert 'web_search="disabled"' in calls[0]
 
     assert answerer.answer(*question) == result
@@ -51,8 +51,8 @@ def test_codex_answerer_uses_fast_text_model_and_extracts_errors(tmp_path):
         return subprocess.CompletedProcess(args, 0, "", "")
 
     CodexAnswerer(command, runner=fake_runner).answer("选正确项", ["甲", "乙"])
-    assert calls[0][calls[0].index("--model") + 1] == "gpt-5.3-codex-spark"
-    assert 'model_reasoning_effort="low"' in calls[0]
+    assert calls[0][calls[0].index("--model") + 1] == "gpt-5.6-sol"
+    assert 'model_reasoning_effort="medium"' in calls[0]
 
     stderr = 'ERROR: {\n  "message": "请求超额"\n}'
     assert CodexAnswerer._error_detail(stderr) == "请求超额"

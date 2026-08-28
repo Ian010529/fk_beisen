@@ -32,7 +32,7 @@ class CodexAnswerer:
         *,
         model: str | None = None,
         reasoning_effort: str | None = None,
-        timeout: int = 30,
+        timeout: int = 60,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ):
         configured = command or os.environ.get("CODEX_BIN") or shutil.which("codex")
@@ -74,12 +74,12 @@ class CodexAnswerer:
             image_paths = self._write_images(temp_dir, image_payloads)
             prompt = self._prompt(stem, options, bool(image_paths))
             selected_model = self.model or (
-                os.environ.get("CODEX_IMAGE_MODEL", "gpt-5.6-luna") if image_paths
-                else os.environ.get("CODEX_TEXT_MODEL", "gpt-5.3-codex-spark")
+                os.environ.get("CODEX_IMAGE_MODEL", "gpt-5.6-sol") if image_paths
+                else os.environ.get("CODEX_TEXT_MODEL", "gpt-5.6-sol")
             )
             selected_effort = self.reasoning_effort or (
-                os.environ.get("CODEX_IMAGE_REASONING_EFFORT", "none") if image_paths
-                else os.environ.get("CODEX_TEXT_REASONING_EFFORT", "low")
+                os.environ.get("CODEX_IMAGE_REASONING_EFFORT", "high") if image_paths
+                else os.environ.get("CODEX_TEXT_REASONING_EFFORT", "medium")
             )
             command = [
                 str(self.command), "exec",
