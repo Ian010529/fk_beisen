@@ -19,7 +19,7 @@
 
 开启“题库未命中时使用 Codex”后，扩展仍会优先查询本地题库，只有题库没有达到匹配阈值时才通过已登录的 Codex CLI 分析题干、选项和题图。未开启时只查询本地题库。Codex 在只读临时目录中以无会话持久化方式运行，不需要额外配置 API Key；每题响应时间和可用额度取决于当前 Codex 账户。
 
-Codex 默认使用低推理强度的 `gpt-5.6-luna`，30 秒超时，并缓存最近 128 道 Codex 答案。可用 `CODEX_MODEL` 和 `CODEX_REASONING_EFFORT` 环境变量覆盖默认值。
+Codex 文本题默认使用 `gpt-5.3-codex-spark` + low，图片题使用 `gpt-5.6-luna` + none，30 秒超时，并缓存最近 128 道 Codex 答案。可用 `CODEX_MODEL` / `CODEX_REASONING_EFFORT` 统一覆盖，或使用 `CODEX_TEXT_MODEL` / `CODEX_TEXT_REASONING_EFFORT` 和 `CODEX_IMAGE_MODEL` / `CODEX_IMAGE_REASONING_EFFORT` 分别覆盖。
 
 Codex 模式会收集题目中的图片 URL、Canvas 和 CSS 背景图，必要时再附带当前可见页面截图。识别结果会显示实际发送给 Codex 的图片数量。
 

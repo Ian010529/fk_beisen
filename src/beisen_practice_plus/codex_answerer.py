@@ -37,8 +37,8 @@ class CodexAnswerer:
     ):
         configured = command or os.environ.get("CODEX_BIN") or shutil.which("codex")
         self.command = Path(configured) if configured else CODEX_FALLBACK
-        self.model = model or os.environ.get("CODEX_MODEL") or "gpt-5.6-luna"
-        self.reasoning_effort = reasoning_effort or os.environ.get("CODEX_REASONING_EFFORT") or "low"
+        self.model = model or os.environ.get("CODEX_MODEL")
+        self.reasoning_effort = reasoning_effort or os.environ.get("CODEX_REASONING_EFFORT")
         self.timeout = timeout
         self.runner = runner
         self._lock = threading.Lock()
@@ -73,12 +73,24 @@ class CodexAnswerer:
             schema_path.write_text(json.dumps(ANSWER_SCHEMA), encoding="utf-8")
             image_paths = self._write_images(temp_dir, image_payloads)
             prompt = self._prompt(stem, options, bool(image_paths))
+            selected_model = self.model or (
+                os.environ.get("CODEX_IMAGE_MODEL", "gpt-5.6-luna") if image_paths
+                else os.environ.get("CODEX_TEXT_MODEL", "gpt-5.3-codex-spark")
+            )
+            selected_effort = self.reasoning_effort or (
+                os.environ.get("CODEX_IMAGE_REASONING_EFFORT", "none") if image_paths
+                else os.environ.get("CODEX_TEXT_REASONING_EFFORT", "low")
+            )
             command = [
                 str(self.command), "exec",
-                "--model", self.model,
-                "--config", f'model_reasoning_effort="{self.reasoning_effort}"',
+                "--model", selected_model,
+                "--config", f'model_reasoning_effort="{selected_effort}"',
+                "--config", 'web_search="disabled"',
                 "--disable", "apps", "--disable", "plugins",
                 "--disable", "hooks", "--disable", "skill_search",
+                "--disable", "shell_tool", "--disable", "browser_use",
+                "--disable", "computer_use", "--disable", "image_generation",
+                "--disable", "multi_agent",
                 "--ephemeral", "--ignore-rules", "--ignore-user-config",
                 "--sandbox", "read-only", "--skip-git-repo-check",
                 "--output-schema", str(schema_path),
@@ -100,8 +112,7 @@ class CodexAnswerer:
             except subprocess.TimeoutExpired as exc:
                 raise RuntimeError(f"Codex 回答超过 {self.timeout} 秒") from exc
             if completed.returncode != 0:
-                detail = completed.stderr.strip().splitlines()[-1:] or ["未知错误"]
-                raise RuntimeError(f"Codex 调用失败：{detail[0]}")
+                raise RuntimeError(f"Codex 调用失败：{self._error_detail(completed.stderr)}")
 
             try:
                 result = json.loads(output_path.read_text(encoding="utf-8"))
@@ -140,6 +151,22 @@ class CodexAnswerer:
         for payload in images:
             digest.update(payload)
         return digest.hexdigest()
+
+    @staticmethod
+    def _error_detail(stderr: str) -> str:
+        messages: list[str] = []
+        for line in stderr.splitlines():
+            if '"message":' not in line:
+                continue
+            value = line.split('"message":', 1)[1].strip().rstrip(",")
+            try:
+                messages.append(str(json.loads(value)))
+            except json.JSONDecodeError:
+                continue
+        if messages:
+            return messages[-1]
+        lines = [line.strip() for line in stderr.splitlines() if line.strip() not in {"{", "}"}]
+        return lines[-1] if lines else "未知错误"
 
     @staticmethod
     def _prompt(stem: str, options: list[str], has_images: bool) -> str:
