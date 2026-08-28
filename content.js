@@ -169,11 +169,17 @@
   }
 
   async function requestMatch(payload) {
+    const localResponse = await chrome.runtime.sendMessage({
+      action: 'matchQuestion',
+      payload: { ...payload, useCodex: false, captureAttempted: false }
+    });
+    if (!localResponse?.ok || localResponse.data?.match || !useCodex) return localResponse;
+
     const panel = document.getElementById('beisen-helper-panel');
     const previousVisibility = panel?.style.visibility || '';
     let captureError = '';
     let screenshot = '';
-    const needsScreenshot = useCodex && payload.hasVisual && payload.imageUrls.length === 0;
+    const needsScreenshot = payload.hasVisual && payload.imageUrls.length === 0;
     if (needsScreenshot && panel) {
       panel.style.visibility = 'hidden';
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -190,7 +196,7 @@
     const imageUrls = screenshot ? [screenshot, ...payload.imageUrls] : payload.imageUrls;
     const response = await chrome.runtime.sendMessage({
         action: 'matchQuestion',
-        payload: { ...payload, imageUrls, useCodex, captureAttempted: needsScreenshot }
+        payload: { ...payload, imageUrls, useCodex: true, captureAttempted: needsScreenshot }
     });
     if (captureError && response?.data?.match) {
       response.data.match.capture_error = captureError;
@@ -435,7 +441,7 @@
         </label>
         <label class="beisen-helper-auto">
           <input id="beisen-helper-use-codex" type="checkbox" ${useCodex ? 'checked' : ''}>
-          使用 Codex 回答（较慢）
+          题库未命中时使用 Codex
         </label>
         <label class="beisen-helper-strategy">
           心理策略
