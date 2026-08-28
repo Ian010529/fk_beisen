@@ -1,9 +1,11 @@
 (() => {
   'use strict';
 
-  const config = window.PLATFORM_CONFIG.beisen;
+  const platformKey = location.hostname === 'iflytek.ceping.com' ? 'iflytek' : 'beisen';
+  const config = window.PLATFORM_CONFIG[platformKey];
   let currentOptionElements = [];
   let autoRecognize = true;
+  let personalityStrategy = 'balanced';
   let identifyInFlight = false;
   let lastFingerprint = '';
   let recognizeTimer = null;
@@ -66,6 +68,43 @@
     return JSON.stringify([payload.stem, payload.options, payload.imageUrls]);
   }
 
+  function isPersonalityScale(options) {
+    const scaleWords = [
+      '符合', '不符合', '同意', '不同意', '愿意', '不愿意',
+      '总是', '经常', '有时', '偶尔', '从不', '非常像', '不像'
+    ];
+    return options.filter(option => scaleWords.some(word => option.includes(word))).length >= 2;
+  }
+
+  function selectPersonalityOption(stem, options) {
+    if (personalityStrategy === 'random') {
+      return Math.floor(Math.random() * options.length);
+    }
+    if (personalityStrategy === 'positive') {
+      return Math.min(Math.floor(options.length * 0.6), options.length - 1);
+    }
+
+    const positiveWords = ['团队', '合作', '学习', '成长', '积极', '主动', '创新', '沟通', '协调'];
+    const negativeWords = ['冲突', '困难', '压力', '挑战', '失败', '矛盾', '问题'];
+    const positive = positiveWords.some(word => stem.includes(word));
+    const negative = negativeWords.some(word => stem.includes(word));
+    if (positive && !negative) return Math.min(1, options.length - 1);
+    return Math.floor(options.length / 2);
+  }
+
+  function showPersonalitySuggestion(payload) {
+    const index = selectPersonalityOption(payload.stem, payload.options);
+    if (currentOptionElements[index]) {
+      currentOptionElements[index].classList.add('beisen-helper-answer');
+    }
+    const strategyNames = { positive: '积极', balanced: '平衡', random: '随机' };
+    setStatus(
+      `心理测评 · ${strategyNames[personalityStrategy]}策略<br><strong>${escapeHtml(payload.options[index])}</strong>`,
+      'success',
+      true
+    );
+  }
+
   async function identify({ automatic = false } = {}) {
     if (identifyInFlight) return;
     let payload;
@@ -82,6 +121,11 @@
     setStatus('正在识别…', 'working');
     clearHighlights();
     try {
+      if (isPersonalityScale(payload.options)) {
+        lastFingerprint = currentFingerprint;
+        showPersonalitySuggestion(payload);
+        return;
+      }
       const response = await chrome.runtime.sendMessage({ action: 'matchQuestion', payload });
       if (!response?.ok) throw new Error(response?.error || '识别请求失败');
       const match = response.data?.match;
@@ -163,6 +207,14 @@
           <input id="beisen-helper-auto" type="checkbox" ${autoRecognize ? 'checked' : ''}>
           自动识别新题
         </label>
+        <label class="beisen-helper-strategy">
+          心理策略
+          <select id="beisen-helper-strategy">
+            <option value="positive" ${personalityStrategy === 'positive' ? 'selected' : ''}>积极</option>
+            <option value="balanced" ${personalityStrategy === 'balanced' ? 'selected' : ''}>平衡</option>
+            <option value="random" ${personalityStrategy === 'random' ? 'selected' : ''}>随机</option>
+          </select>
+        </label>
         <div id="beisen-helper-status">等待识别</div>
       </div>`;
     document.body.appendChild(panel);
@@ -175,6 +227,12 @@
         lastFingerprint = '';
         scheduleAutoRecognize();
       }
+    });
+    document.getElementById('beisen-helper-strategy').addEventListener('change', event => {
+      personalityStrategy = event.currentTarget.value;
+      chrome.storage.local.set({ personalityStrategy });
+      lastFingerprint = '';
+      scheduleAutoRecognize();
     });
     document.getElementById('beisen-helper-toggle').addEventListener('click', event => {
       const body = document.getElementById('beisen-helper-body');
@@ -192,8 +250,9 @@
   });
 
   function init() {
-    chrome.storage.local.get({ autoRecognize: true }, result => {
+    chrome.storage.local.get({ autoRecognize: true, personalityStrategy: 'balanced' }, result => {
       autoRecognize = result.autoRecognize !== false;
+      personalityStrategy = result.personalityStrategy || 'balanced';
       if (findQuestion()) createPanel();
 
       const observer = new MutationObserver(mutations => {

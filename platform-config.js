@@ -16,6 +16,24 @@ const PLATFORM_CONFIG = {
         '[class*="option-item"]', '[class*="optionItem"]', 'label'
       ]
     }
+  },
+  iflytek: {
+    name: '科大讯飞人才评估',
+    urlPatterns: ['iflytek.ceping.com'],
+    selectors: {
+      question: [
+        '.question-container__comp', '.question-container',
+        '[class*="question-container"]'
+      ],
+      stem: [
+        '.question-container__comp pre', '.question-container pre',
+        'pre', '[class*="question-title"]'
+      ],
+      options: [
+        '.single-choice__item', '.multiple-choice__item',
+        '[class*="choice__item"]'
+      ]
+    }
   }
 };
 

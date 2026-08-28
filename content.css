@@ -52,6 +52,17 @@
   user-select: none;
 }
 
+.beisen-helper-strategy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.beisen-helper-strategy select {
+  padding: 3px 6px;
+}
+
 #beisen-helper-status {
   margin-top: 10px;
   padding: 9px;

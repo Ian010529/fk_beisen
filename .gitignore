@@ -16,3 +16,5 @@ data/*
 # Local matcher cache and unpacked extension packages.
 *.crx
 extension-build/
+.matcher.pid
+.matcher.log
