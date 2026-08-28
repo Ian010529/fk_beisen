@@ -48,9 +48,13 @@ def test_codex_answerer_uses_fast_text_model_and_extracts_errors(tmp_path):
         output_path = args[args.index("--output-last-message") + 1]
         with open(output_path, "w", encoding="utf-8") as output:
             json.dump({"option_index": 0, "confidence": 0.8, "reason": "文本题"}, output)
+        assert "平衡策略" in kwargs["input"]
+        assert "不得回答缺少个人信息" in kwargs["input"]
         return subprocess.CompletedProcess(args, 0, "", "")
 
-    CodexAnswerer(command, runner=fake_runner).answer("选正确项", ["甲", "乙"])
+    CodexAnswerer(command, runner=fake_runner).answer(
+        "选正确项", ["甲", "乙"], personality_strategy="balanced"
+    )
     assert calls[0][calls[0].index("--model") + 1] == "gpt-5.6-sol"
     assert 'model_reasoning_effort="medium"' in calls[0]
 

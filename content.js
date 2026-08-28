@@ -171,7 +171,7 @@
   async function requestMatch(payload) {
     const localResponse = await chrome.runtime.sendMessage({
       action: 'matchQuestion',
-      payload: { ...payload, useCodex: false, captureAttempted: false }
+      payload: { ...payload, useCodex: false, captureAttempted: false, personalityStrategy }
     });
     if (!localResponse?.ok || localResponse.data?.match || !useCodex) return localResponse;
 
@@ -196,7 +196,10 @@
     const imageUrls = screenshot ? [screenshot, ...payload.imageUrls] : payload.imageUrls;
     const response = await chrome.runtime.sendMessage({
         action: 'matchQuestion',
-        payload: { ...payload, imageUrls, useCodex: true, captureAttempted: needsScreenshot }
+        payload: {
+          ...payload, imageUrls, useCodex: true,
+          captureAttempted: needsScreenshot, personalityStrategy
+        }
     });
     if (captureError && response?.data?.match) {
       response.data.match.capture_error = captureError;

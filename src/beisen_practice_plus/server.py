@@ -63,10 +63,15 @@ def make_handler(matcher: QuestionMatcher, codex: CodexAnswerer | None = None):
                 stem = str(body.get("stem", ""))
                 options = [str(value) for value in body.get("options", [])][:8]
                 images = decode_images(body.get("images", []))
+                personality_strategy = str(body.get("personality_strategy", "profile"))
+                if personality_strategy not in {"profile", "positive", "balanced", "random"}:
+                    personality_strategy = "profile"
                 if body.get("use_codex"):
                     if not codex:
                         raise RuntimeError("Codex 回答器未配置")
-                    result = codex.answer(stem, options, images)
+                    result = codex.answer(
+                        stem, options, images, personality_strategy=personality_strategy
+                    )
                 else:
                     result = matcher.match(stem, options, images)
                 self._json(200, {"match": result})

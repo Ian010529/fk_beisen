@@ -45,7 +45,8 @@ async function matchQuestion(payload, windowId) {
         stem: payload.stem || '',
         options: payload.options || [],
         images: usableImages,
-        use_codex: payload.useCodex === true
+        use_codex: payload.useCodex === true,
+        personality_strategy: payload.personalityStrategy || 'profile'
       })
     });
     if (!response.ok) {
