@@ -48,7 +48,10 @@ async function matchQuestion(payload, windowId) {
         use_codex: payload.useCodex === true
       })
     });
-    if (!response.ok) throw new Error(`识别服务返回 HTTP ${response.status}`);
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null);
+      throw new Error(detail?.error || `识别服务返回 HTTP ${response.status}`);
+    }
     const data = await response.json();
     if (captureError && data?.match) data.match.capture_error = captureError;
     return { ok: true, data };
@@ -81,7 +84,8 @@ async function fetchImage(url) {
     const response = await fetch(url, { credentials: 'include' });
     if (!response.ok) return null;
     const blob = await response.blob();
-    if (!blob.type.startsWith('image/') || blob.size > 8 * 1024 * 1024) return null;
+    const supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supported.includes(blob.type) || blob.size > 8 * 1024 * 1024) return null;
     return { data: await blobToDataUrl(blob) };
   } catch (_) {
     return null;

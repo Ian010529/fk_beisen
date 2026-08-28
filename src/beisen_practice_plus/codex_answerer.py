@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import tempfile
 import threading
+from collections import OrderedDict
+from hashlib import sha256
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -28,14 +30,19 @@ class CodexAnswerer:
         self,
         command: str | Path | None = None,
         *,
-        timeout: int = 90,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
+        timeout: int = 30,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ):
         configured = command or os.environ.get("CODEX_BIN") or shutil.which("codex")
         self.command = Path(configured) if configured else CODEX_FALLBACK
+        self.model = model or os.environ.get("CODEX_MODEL") or "gpt-5.6-luna"
+        self.reasoning_effort = reasoning_effort or os.environ.get("CODEX_REASONING_EFFORT") or "low"
         self.timeout = timeout
         self.runner = runner
         self._lock = threading.Lock()
+        self._cache: OrderedDict[str, dict[str, object]] = OrderedDict()
 
     @property
     def available(self) -> bool:
@@ -52,15 +59,26 @@ class CodexAnswerer:
         if len(options) < 2:
             raise ValueError("Codex 回答至少需要两个选项")
 
+        image_payloads = tuple(images)
+        cache_key = self._cache_key(stem, options, image_payloads)
         with self._lock, tempfile.TemporaryDirectory(prefix="fk-beisen-codex-") as temp:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                self._cache.move_to_end(cache_key)
+                return dict(cached)
+
             temp_dir = Path(temp)
             schema_path = temp_dir / "answer-schema.json"
             output_path = temp_dir / "answer.json"
             schema_path.write_text(json.dumps(ANSWER_SCHEMA), encoding="utf-8")
-            image_paths = self._write_images(temp_dir, images)
+            image_paths = self._write_images(temp_dir, image_payloads)
             prompt = self._prompt(stem, options, bool(image_paths))
             command = [
                 str(self.command), "exec",
+                "--model", self.model,
+                "--config", f'model_reasoning_effort="{self.reasoning_effort}"',
+                "--disable", "apps", "--disable", "plugins",
+                "--disable", "hooks", "--disable", "skill_search",
                 "--ephemeral", "--ignore-rules", "--ignore-user-config",
                 "--sandbox", "read-only", "--skip-git-repo-check",
                 "--output-schema", str(schema_path),
@@ -94,7 +112,7 @@ class CodexAnswerer:
                 raise RuntimeError("Codex 返回的答案格式无效") from exc
             if not 0 <= index < len(options):
                 raise RuntimeError("Codex 返回了无效的选项序号")
-            return {
+            answer = {
                 "question_id": "codex",
                 "category": "codex",
                 "method": "codex",
@@ -109,6 +127,19 @@ class CodexAnswerer:
                 "reason": reason,
                 "input_images": len(image_paths),
             }
+            self._cache[cache_key] = answer
+            self._cache.move_to_end(cache_key)
+            if len(self._cache) > 128:
+                self._cache.popitem(last=False)
+            return dict(answer)
+
+    @staticmethod
+    def _cache_key(stem: str, options: list[str], images: Iterable[bytes]) -> str:
+        digest = sha256()
+        digest.update(json.dumps([stem, options], ensure_ascii=False).encode("utf-8"))
+        for payload in images:
+            digest.update(payload)
+        return digest.hexdigest()
 
     @staticmethod
     def _prompt(stem: str, options: list[str], has_images: bool) -> str:
@@ -126,7 +157,16 @@ class CodexAnswerer:
     def _write_images(temp_dir: Path, images: Iterable[bytes]) -> list[Path]:
         paths: list[Path] = []
         for index, payload in enumerate(images):
-            suffix = ".jpg" if payload.startswith(b"\xff\xd8\xff") else ".png"
+            if payload.startswith(b"\xff\xd8\xff"):
+                suffix = ".jpg"
+            elif payload.startswith(b"\x89PNG\r\n\x1a\n"):
+                suffix = ".png"
+            elif payload.startswith(b"RIFF") and payload[8:12] == b"WEBP":
+                suffix = ".webp"
+            elif payload.startswith((b"GIF87a", b"GIF89a")):
+                suffix = ".gif"
+            else:
+                continue
             path = temp_dir / f"question-{index}{suffix}"
             path.write_bytes(payload)
             paths.append(path)
