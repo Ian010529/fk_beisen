@@ -1,0 +1,14 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Synced upstream question bank and generated validation output.
+data/*
+!data/.gitkeep

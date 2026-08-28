@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beisen-practice-plus"
+version = "0.1.0"
+description = "Local practice toolkit for importing and validating the BeiSen_Practice question bank."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.31",
+  "numpy>=1.24",
+  "opencv-python-headless>=4.8",
+  "scikit-image>=0.22",
+  "rapidfuzz>=3.6",
+]
+
+[project.scripts]
+beisen-practice = "beisen_practice_plus.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
