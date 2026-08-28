@@ -5,7 +5,8 @@ async function refreshStatus() {
   const response = await chrome.runtime.sendMessage({ action: 'checkService' });
   if (response?.ok) {
     const data = response.data;
-    statusElement.textContent = `服务正常：${data.questions} 题，${data.images} 张索引图`;
+    const codex = data.codex ? '，Codex 已连接' : '，Codex 不可用';
+    statusElement.textContent = `服务正常：${data.questions} 题，${data.images} 张索引图${codex}`;
     identifyButton.disabled = false;
   } else {
     statusElement.textContent = response?.error || '本地服务不可用';

@@ -30,7 +30,8 @@ async function matchQuestion(payload) {
       body: JSON.stringify({
         stem: payload.stem || '',
         options: payload.options || [],
-        images: images.filter(Boolean)
+        images: images.filter(Boolean),
+        use_codex: payload.useCodex === true
       })
     });
     if (!response.ok) throw new Error(`识别服务返回 HTTP ${response.status}`);

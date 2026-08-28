@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from .codex_answerer import CodexAnswerer
 from .importer import parse_questions_js, read_bank
 from .question_matcher import QuestionMatcher
 
@@ -32,7 +33,7 @@ def decode_images(raw_images: list[Any]) -> list[bytes]:
     return decoded
 
 
-def make_handler(matcher: QuestionMatcher):
+def make_handler(matcher: QuestionMatcher, codex: CodexAnswerer | None = None):
     class Handler(BaseHTTPRequestHandler):
         def do_OPTIONS(self):
             self.send_response(204)
@@ -47,6 +48,7 @@ def make_handler(matcher: QuestionMatcher):
                 "status": "ok",
                 "questions": len(matcher.questions),
                 "images": matcher.images.image_count,
+                "codex": bool(codex and codex.available),
             })
 
         def do_POST(self):
@@ -60,10 +62,18 @@ def make_handler(matcher: QuestionMatcher):
                 body = json.loads(self.rfile.read(length))
                 stem = str(body.get("stem", ""))
                 options = [str(value) for value in body.get("options", [])][:8]
-                result = matcher.match(stem, options, decode_images(body.get("images", [])))
+                images = decode_images(body.get("images", []))
+                if body.get("use_codex"):
+                    if not codex:
+                        raise RuntimeError("Codex 回答器未配置")
+                    result = codex.answer(stem, options, images)
+                else:
+                    result = matcher.match(stem, options, images)
                 self._json(200, {"match": result})
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 self._json(400, {"error": str(exc)})
+            except RuntimeError as exc:
+                self._json(502, {"error": str(exc)})
 
         def log_message(self, format, *args):
             print(f"[matcher] {self.address_string()} {format % args}")
@@ -88,7 +98,9 @@ def make_handler(matcher: QuestionMatcher):
 def run_server(bank: str | Path, image_dir: str | Path, host: str = "127.0.0.1", port: int = 8765):
     questions = load_questions(bank)
     matcher = QuestionMatcher(questions, image_dir)
-    server = ThreadingHTTPServer((host, port), make_handler(matcher))
+    codex = CodexAnswerer()
+    server = ThreadingHTTPServer((host, port), make_handler(matcher, codex))
     print(f"Loaded {len(questions)} questions and {matcher.images.image_count} referenced images")
+    print(f"Codex CLI: {'available' if codex.available else 'unavailable'}")
     print(f"Matcher service: http://{host}:{port}")
     server.serve_forever()

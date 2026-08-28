@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "北森题库识别助手",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "从本地题库识别北森测评题目、图形并高亮匹配选项",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://iflytek.ceping.com/*",
+    "https://tas.talebase.com/*",
     "*://*.beisen.com/*",
     "*://*.bestalent.com/*",
     "*://*.beisencloud.com/*",
@@ -30,7 +31,8 @@
         "*://*.bestalent.com/*",
         "*://*.beisencloud.com/*",
         "*://*.beisenc.com/*",
-        "https://iflytek.ceping.com/*"
+        "https://iflytek.ceping.com/*",
+        "https://tas.talebase.com/*"
       ],
       "js": ["platform-config.js", "psychometric-profile.js", "content.js"],
       "css": ["content.css"],

@@ -35,6 +35,28 @@ const PLATFORM_CONFIG = {
         'div[data-cls="tuozhuai-content"] span[class*="I6Yvw"]'
       ]
     }
+  },
+  talebase: {
+    name: 'TaleBase TAS 智选',
+    urlPatterns: ['tas.talebase.com'],
+    selectors: {
+      question: [
+        '.tbc-question', '.question-box', '.tbc-single-choice',
+        '.tbc-single-choice360', '.tbc-force-choice', '[class*="tbc-scale"]'
+      ],
+      stem: [
+        '.tbc-single-choice__stem', '.tbc-single-choice360__stem',
+        '.tbc-force-choice__stem', '.tbc-force__stem',
+        '.tbc-scale__stem', '.tbc-scale360__item__stem', '.ques_stem'
+      ],
+      options: [
+        '.tbc-single-choice__option',
+        '.tbc-single-choice360__table__item__option__item',
+        '.tbc-force-choice__option-item',
+        '.tbc-scale360__item__option__item',
+        'label'
+      ]
+    }
   }
 };
 

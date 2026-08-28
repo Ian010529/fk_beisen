@@ -1,13 +1,16 @@
 (() => {
   'use strict';
 
-  const platformKey = location.hostname === 'iflytek.ceping.com' ? 'iflytek' : 'beisen';
+  const platformKey = location.hostname === 'iflytek.ceping.com'
+    ? 'iflytek'
+    : location.hostname === 'tas.talebase.com' ? 'talebase' : 'beisen';
   const config = window.PLATFORM_CONFIG[platformKey];
   let currentOptionElements = [];
   let autoRecognize = true;
   let autoSelect = false;
   let autoAdvance = false;
   let autoSubmit = false;
+  let useCodex = false;
   let personalityStrategy = 'profile';
   let identifyInFlight = false;
   let submitInFlight = false;
@@ -245,12 +248,15 @@
         await showAdjectiveSuggestion(payload);
         return;
       }
-      if (isPersonalityScale(payload.options)) {
+      if (isPersonalityScale(payload.options) && !useCodex) {
         lastFingerprint = currentFingerprint;
         showPersonalitySuggestion(payload);
         return;
       }
-      const response = await chrome.runtime.sendMessage({ action: 'matchQuestion', payload });
+      const response = await chrome.runtime.sendMessage({
+        action: 'matchQuestion',
+        payload: { ...payload, useCodex }
+      });
       if (!response?.ok) throw new Error(response?.error || '识别请求失败');
       const match = response.data?.match;
       if (!match) throw new Error('题库中没有达到阈值的候选题');
@@ -292,8 +298,10 @@
     const confidence = Math.round((match.confidence || 0) * 100);
     const optionConfidence = Math.round((match.option_confidence || 0) * 100);
     const answer = match.page_option_text || `${match.answer_key}. ${match.answer_text}`;
+    const reason = match.reason ? `<br>${escapeHtml(match.reason)}` : '';
     setStatus(
-      `${match.question_id} · ${match.method} ${confidence}%<br><strong>${escapeHtml(answer)}</strong><br>选项匹配 ${optionConfidence}%`,
+      `${match.question_id} · ${match.method} ${confidence}%<br><strong>${escapeHtml(answer)}</strong>` +
+      `${reason}<br>选项匹配 ${optionConfidence}%`,
       'success',
       true
     );
@@ -348,6 +356,10 @@
           <input id="beisen-helper-auto-submit" type="checkbox" ${autoSubmit ? 'checked' : ''}>
           自动提交测评
         </label>
+        <label class="beisen-helper-auto">
+          <input id="beisen-helper-use-codex" type="checkbox" ${useCodex ? 'checked' : ''}>
+          使用 Codex 回答（较慢）
+        </label>
         <label class="beisen-helper-strategy">
           心理策略
           <select id="beisen-helper-strategy">
@@ -384,6 +396,12 @@
       autoSubmit = event.currentTarget.checked;
       chrome.storage.local.set({ autoSubmit });
     });
+    document.getElementById('beisen-helper-use-codex').addEventListener('change', event => {
+      useCodex = event.currentTarget.checked;
+      chrome.storage.local.set({ useCodex });
+      lastFingerprint = '';
+      if (useCodex) scheduleAutoRecognize();
+    });
     document.getElementById('beisen-helper-strategy').addEventListener('change', event => {
       personalityStrategy = event.currentTarget.value;
       chrome.storage.local.set({ personalityStrategy });
@@ -411,12 +429,14 @@
       autoSelect: false,
       autoAdvance: false,
       autoSubmit: false,
+      useCodex: false,
       personalityStrategy: 'profile'
     }, result => {
       autoRecognize = result.autoRecognize !== false;
       autoSelect = result.autoSelect === true;
       autoAdvance = result.autoAdvance === true;
       autoSubmit = result.autoSubmit === true;
+      useCodex = result.useCodex === true;
       personalityStrategy = result.personalityStrategy || 'profile';
       if (window === window.top || findQuestion()) createPanel();
 
