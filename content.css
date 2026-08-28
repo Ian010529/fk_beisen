@@ -83,6 +83,7 @@
 #beisen-helper-status.working { color: #1769aa; }
 #beisen-helper-status.error { background: #fff0f0; color: #b42318; }
 #beisen-helper-status.success { background: #edf9f1; color: #126b39; }
+.beisen-helper-warning { color: #b42318; }
 
 .beisen-helper-answer {
   outline: 3px solid #21a35b !important;

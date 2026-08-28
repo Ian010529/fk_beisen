@@ -159,18 +159,30 @@
   async function requestMatch(payload) {
     const panel = document.getElementById('beisen-helper-panel');
     const previousVisibility = panel?.style.visibility || '';
+    let captureError = '';
+    let screenshot = '';
     if (useCodex && panel) {
       panel.style.visibility = 'hidden';
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     }
     try {
-      return await chrome.runtime.sendMessage({
-        action: 'matchQuestion',
-        payload: { ...payload, useCodex }
-      });
+      if (useCodex) {
+        const capture = await chrome.runtime.sendMessage({ action: 'captureVisiblePage' });
+        if (capture?.ok) screenshot = capture.data;
+        else captureError = capture?.error || '当前页面截图失败';
+      }
     } finally {
       if (panel) panel.style.visibility = previousVisibility;
     }
+    const imageUrls = screenshot ? [screenshot, ...payload.imageUrls] : payload.imageUrls;
+    const response = await chrome.runtime.sendMessage({
+        action: 'matchQuestion',
+        payload: { ...payload, imageUrls, useCodex }
+    });
+    if (captureError && response?.data?.match) {
+      response.data.match.capture_error = captureError;
+    }
+    return response;
   }
 
   function findActionElement(labels, root = document) {
@@ -346,9 +358,12 @@
     const imageInfo = Number.isInteger(match.input_images)
       ? `<br>已发送图片 ${match.input_images} 张`
       : '';
+    const captureError = match.capture_error
+      ? `<br><span class="beisen-helper-warning">${escapeHtml(match.capture_error)}</span>`
+      : '';
     setStatus(
       `${match.question_id} · ${match.method} ${confidence}%<br><strong>${escapeHtml(answer)}</strong>` +
-      `${reason}${imageInfo}<br>选项匹配 ${optionConfidence}%`,
+      `${reason}${imageInfo}${captureError}<br>选项匹配 ${optionConfidence}%`,
       'success',
       true
     );

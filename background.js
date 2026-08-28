@@ -6,7 +6,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === 'matchQuestion') {
-    matchQuestion(request.payload || {}, sender.tab?.windowId).then(sendResponse);
+    matchQuestion(request.payload || {}).then(sendResponse);
+    return true;
+  }
+  if (request.action === 'captureVisiblePage') {
+    captureVisiblePage(sender.tab?.windowId).then(sendResponse);
     return true;
   }
 });
@@ -21,13 +25,9 @@ async function checkService() {
   }
 }
 
-async function matchQuestion(payload, windowId) {
+async function matchQuestion(payload) {
   try {
     const images = await Promise.all((payload.imageUrls || []).slice(0, 6).map(fetchImage));
-    if (payload.useCodex === true && Number.isInteger(windowId)) {
-      const screenshot = await captureVisiblePage(windowId);
-      if (screenshot) images.unshift(screenshot);
-    }
     const response = await fetch(`${MATCHER_URL}/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,11 +46,19 @@ async function matchQuestion(payload, windowId) {
 }
 
 async function captureVisiblePage(windowId) {
+  if (!Number.isInteger(windowId)) {
+    return { ok: false, error: '无法确定当前测评窗口' };
+  }
   try {
     const data = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 90 });
-    return data ? { data } : null;
+    return data
+      ? { ok: true, data }
+      : { ok: false, error: '当前页面截图为空' };
   } catch (_) {
-    return null;
+    return {
+      ok: false,
+      error: '截图未授权：进入测评前请点击一次浏览器工具栏中的扩展图标'
+    };
   }
 }
 

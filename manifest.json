@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "北森题库识别助手",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "从本地题库识别北森测评题目、图形并高亮匹配选项",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
