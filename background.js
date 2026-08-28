@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === 'matchQuestion') {
-    matchQuestion(request.payload || {}).then(sendResponse);
+    matchQuestion(request.payload || {}, sender.tab?.windowId).then(sendResponse);
     return true;
   }
   if (request.action === 'captureVisiblePage') {
@@ -25,21 +25,33 @@ async function checkService() {
   }
 }
 
-async function matchQuestion(payload) {
+async function matchQuestion(payload, windowId) {
   try {
     const images = await Promise.all((payload.imageUrls || []).slice(0, 6).map(fetchImage));
+    const usableImages = images.filter(Boolean);
+    let captureError = '';
+    if (
+      payload.useCodex === true && payload.hasVisual === true &&
+      usableImages.length === 0 && payload.captureAttempted !== true
+    ) {
+      const capture = await captureVisiblePage(windowId);
+      if (capture.ok) usableImages.push({ data: capture.data });
+      else captureError = capture.error;
+    }
     const response = await fetch(`${MATCHER_URL}/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         stem: payload.stem || '',
         options: payload.options || [],
-        images: images.filter(Boolean),
+        images: usableImages,
         use_codex: payload.useCodex === true
       })
     });
     if (!response.ok) throw new Error(`识别服务返回 HTTP ${response.status}`);
-    return { ok: true, data: await response.json() };
+    const data = await response.json();
+    if (captureError && data?.match) data.match.capture_error = captureError;
+    return { ok: true, data };
   } catch (error) {
     return { ok: false, error: error.message };
   }

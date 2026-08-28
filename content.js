@@ -60,28 +60,40 @@
     if (!question) throw new Error('没有检测到当前题目容器');
     currentOptionElements = findOptions(question);
     if (currentOptionElements.length < 2) throw new Error('没有检测到可匹配的选项');
-    const imageUrls = [...question.querySelectorAll('img')]
-      .filter(image => isVisible(image) && image.naturalWidth >= 40 && image.naturalHeight >= 40)
+    const visibleImages = [...question.querySelectorAll('img')]
+      .filter(image => isVisible(image) && image.naturalWidth >= 40 && image.naturalHeight >= 40);
+    const imageUrls = visibleImages
       .map(image => image.currentSrc || image.src)
       .filter(Boolean);
+    let hasVisual = visibleImages.length > 0;
     for (const element of question.querySelectorAll('*')) {
       if (!isVisible(element)) continue;
       const match = getComputedStyle(element).backgroundImage.match(/url\(["']?(.+?)["']?\)/);
-      if (match) imageUrls.push(new URL(match[1], location.href).href);
+      if (match) {
+        hasVisual = true;
+        imageUrls.push(new URL(match[1], location.href).href);
+      }
     }
     for (const canvas of question.querySelectorAll('canvas')) {
       try {
         if (isVisible(canvas) && canvas.width >= 40 && canvas.height >= 40) {
+          hasVisual = true;
           imageUrls.push(canvas.toDataURL('image/png'));
         }
       } catch (_) {
+        hasVisual = true;
         // A cross-origin canvas cannot be serialized; the viewport screenshot remains available.
       }
     }
+    hasVisual ||= [...question.querySelectorAll('svg')].some(svg => {
+      const rect = svg.getBoundingClientRect();
+      return isVisible(svg) && rect.width >= 40 && rect.height >= 40;
+    });
     return {
       stem: findStem(question),
       options: currentOptionElements.map(textOf),
-      imageUrls: [...new Set(imageUrls)]
+      imageUrls: [...new Set(imageUrls)],
+      hasVisual
     };
   }
 
@@ -161,12 +173,13 @@
     const previousVisibility = panel?.style.visibility || '';
     let captureError = '';
     let screenshot = '';
-    if (useCodex && panel) {
+    const needsScreenshot = useCodex && payload.hasVisual && payload.imageUrls.length === 0;
+    if (needsScreenshot && panel) {
       panel.style.visibility = 'hidden';
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     }
     try {
-      if (useCodex) {
+      if (needsScreenshot) {
         const capture = await chrome.runtime.sendMessage({ action: 'captureVisiblePage' });
         if (capture?.ok) screenshot = capture.data;
         else captureError = capture?.error || '当前页面截图失败';
@@ -177,7 +190,7 @@
     const imageUrls = screenshot ? [screenshot, ...payload.imageUrls] : payload.imageUrls;
     const response = await chrome.runtime.sendMessage({
         action: 'matchQuestion',
-        payload: { ...payload, imageUrls, useCodex }
+        payload: { ...payload, imageUrls, useCodex, captureAttempted: needsScreenshot }
     });
     if (captureError && response?.data?.match) {
       response.data.match.capture_error = captureError;
@@ -356,7 +369,9 @@
     const answer = match.page_option_text || `${match.answer_key}. ${match.answer_text}`;
     const reason = match.reason ? `<br>${escapeHtml(match.reason)}` : '';
     const imageInfo = Number.isInteger(match.input_images)
-      ? `<br>已发送图片 ${match.input_images} 张`
+      ? match.input_images > 0
+        ? `<br>已发送图片 ${match.input_images} 张`
+        : payload.hasVisual ? '<br>已发送图片 0 张' : '<br>文本题，未截图'
       : '';
     const captureError = match.capture_error
       ? `<br><span class="beisen-helper-warning">${escapeHtml(match.capture_error)}</span>`
